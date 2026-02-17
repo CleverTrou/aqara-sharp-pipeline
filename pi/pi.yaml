@@ -1,0 +1,68 @@
+# =============================================================================
+# Pi Monitor Configuration
+# =============================================================================
+# Used by both monitor.py and ifttt_relay.py.
+
+camera:
+  # Your Aqara G5 Pro's RTSP URL.
+  # Use the camera's LOCAL (LAN) IP here — not a Tailscale IP.
+  # The Pi is on the same LAN as the camera.
+  #
+  # Find the URL in: Aqara App → Camera → Settings → RTSP
+  # Resolutions: 360p, 1080p, 1520p
+  #
+  # TIP: Use 360p for the motion monitor (compare_width/height downscales
+  # anyway). The VPS pulls the full-resolution 1520p frame separately.
+  rtsp_url: "rtsp://USER:PASS@192.168.1.100:8554/360p"
+  rtsp_transport: "tcp"
+
+detection:
+  # How often to check for changes (seconds).
+  # Pi Zero 2 W: 3s is safe. Pi 4: can go down to 1s.
+  poll_interval: 3
+
+  # Resolution for the comparison frame (NOT the actual snapshot).
+  # Smaller = faster. 320x240 is plenty for motion detection.
+  compare_width: 320
+  compare_height: 240
+
+  # Sensitivity tuning:
+  #
+  # threshold: per-pixel brightness change to count as "different" (0-255)
+  #   - 10-15: very sensitive (indoor, static scene)
+  #   - 20-25: moderate (outdoor, some wind/shadows)
+  #   - 30+:   low sensitivity (only major changes)
+  threshold: 20
+
+  # min_changed_pct: minimum % of pixels that must change to trigger
+  #   - 2-3%:  very sensitive
+  #   - 5-8%:  moderate (recommended)
+  #   - 10%+:  only large objects / close range
+  min_changed_pct: 5.0
+
+  # Seconds to wait after a trigger before re-arming.
+  # Should be at least as long as the VPS SHARP processing time.
+  cooldown: 30
+
+  # Number of consecutive "changed" frames needed before triggering.
+  # 1 = instant trigger, 2-3 = filters out single-frame noise.
+  confirm_frames: 2
+
+vps:
+  # Your VPS's Tailscale IP and port.
+  # This is the SHARP pipeline server's /trigger endpoint.
+  trigger_url: "http://100.x.x.20:8080/trigger"
+  timeout: 10
+
+relay:
+  # IFTTT relay settings (only used by ifttt_relay.py).
+  host: "0.0.0.0"
+  port: 9090
+
+logging:
+  level: "INFO"
+
+  # Set to true to save the frame that triggered detection.
+  # Useful for tuning threshold/sensitivity. Saves as .ppm files.
+  save_debug_frames: false
+  debug_dir: "/tmp/sharp-monitor-debug"

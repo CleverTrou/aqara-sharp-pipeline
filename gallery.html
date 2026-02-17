@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHARP Gaussian Splats</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+            background: #0a0a0a; color: #e0e0e0;
+            padding: 20px; max-width: 900px; margin: 0 auto;
+        }
+        h1 { margin-bottom: 8px; font-size: 1.5rem; color: #fff; }
+        .subtitle { color: #888; margin-bottom: 24px; font-size: 0.9rem; }
+        .status-badge {
+            display: inline-block; padding: 4px 12px; border-radius: 12px;
+            font-size: 0.8rem; margin-bottom: 20px;
+        }
+        .status-idle { background: #1a3a1a; color: #4ade80; }
+        .status-processing { background: #3a2a0a; color: #fbbf24; }
+        .event-card {
+            background: #141414; border: 1px solid #2a2a2a; border-radius: 12px;
+            padding: 16px; margin-bottom: 12px;
+            display: flex; gap: 16px; align-items: center;
+        }
+        .event-card img {
+            width: 120px; height: 80px; object-fit: cover;
+            border-radius: 8px; background: #222;
+        }
+        .event-info { flex: 1; }
+        .event-id { font-family: monospace; font-size: 0.85rem; color: #aaa; }
+        .event-size { font-size: 0.8rem; color: #666; margin-top: 4px; }
+        .download-btn {
+            display: inline-block; padding: 8px 16px;
+            background: #2563eb; color: #fff; text-decoration: none;
+            border-radius: 8px; font-size: 0.85rem; font-weight: 500;
+        }
+        .download-btn:hover { background: #1d4ed8; }
+        .empty { text-align: center; padding: 60px 20px; color: #555; }
+        @media (max-width: 600px) {
+            .event-card { flex-direction: column; align-items: flex-start; }
+            .event-card img { width: 100%; height: auto; max-height: 200px; }
+        }
+    </style>
+</head>
+<body>
+    <h1>SHARP Gaussian Splats</h1>
+    <p class="subtitle">Aqara G5 Pro &rarr; SHARP &rarr; 3D Gaussian Splat</p>
+    <div id="status"></div>
+    <div id="events"></div>
+
+    <script>
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            var mb = bytes / 1024 / 1024;
+            return mb.toFixed(1) + ' MB';
+        }
+
+        function createStatusBadge(processing) {
+            var badge = document.createElement('span');
+            badge.className = 'status-badge ' + (processing ? 'status-processing' : 'status-idle');
+            badge.textContent = processing ? 'Processing event...' : 'Idle \u2014 waiting for events';
+            return badge;
+        }
+
+        function createEventCard(event) {
+            var card = document.createElement('div');
+            card.className = 'event-card';
+
+            if (event.has_snapshot) {
+                var img = document.createElement('img');
+                img.src = '/captures/' + encodeURIComponent(event.event_id) + '/snapshot.jpg';
+                img.alt = 'snapshot';
+                card.appendChild(img);
+            }
+
+            var info = document.createElement('div');
+            info.className = 'event-info';
+
+            var idEl = document.createElement('div');
+            idEl.className = 'event-id';
+            idEl.textContent = event.event_id;
+            info.appendChild(idEl);
+
+            var sizeEl = document.createElement('div');
+            sizeEl.className = 'event-size';
+            sizeEl.textContent = event.has_ply ? formatSize(event.ply_size) : 'Processing...';
+            info.appendChild(sizeEl);
+
+            card.appendChild(info);
+
+            if (event.has_ply && event.ply_filename) {
+                var btn = document.createElement('a');
+                btn.className = 'download-btn';
+                btn.href = '/splats/' + encodeURIComponent(event.event_id) + '/' + encodeURIComponent(event.ply_filename);
+                btn.textContent = 'Download .ply';
+                card.appendChild(btn);
+            }
+
+            return card;
+        }
+
+        function createEmptyMessage() {
+            var el = document.createElement('div');
+            el.className = 'empty';
+            el.textContent = 'No splats yet. Waiting for camera events...';
+            return el;
+        }
+
+        async function refresh() {
+            try {
+                var responses = await Promise.all([
+                    fetch('/status'), fetch('/events')
+                ]);
+                var statusData = await responses[0].json();
+                var eventsData = await responses[1].json();
+
+                var statusContainer = document.getElementById('status');
+                statusContainer.replaceChildren(createStatusBadge(statusData.processing));
+
+                var eventsContainer = document.getElementById('events');
+                eventsContainer.replaceChildren();
+
+                if (!eventsData || eventsData.length === 0) {
+                    eventsContainer.appendChild(createEmptyMessage());
+                    return;
+                }
+
+                for (var i = 0; i < eventsData.length; i++) {
+                    eventsContainer.appendChild(createEventCard(eventsData[i]));
+                }
+            } catch (err) {
+                // Silently retry on next interval
+            }
+        }
+
+        refresh();
+        setInterval(refresh, 5000);
+    </script>
+</body>
+</html>

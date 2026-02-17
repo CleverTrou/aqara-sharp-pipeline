@@ -1,0 +1,26 @@
+# =============================================================================
+# Home Assistant Configuration Additions
+# =============================================================================
+# Add these sections to your existing configuration.yaml.
+# Replace VPS_TAILSCALE_IP with your VPS's Tailscale IP (e.g., 100.64.0.20).
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST Commands — for Approach A (lightweight trigger)
+# ─────────────────────────────────────────────────────────────────────────────
+rest_command:
+  sharp_trigger:
+    url: "http://VPS_TAILSCALE_IP:8080/trigger"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    payload: '{"source": "{{ source }}", "event_type": "{{ event_type }}"}'
+    timeout: 10
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shell Commands — for Approach B (upload snapshot)
+# ─────────────────────────────────────────────────────────────────────────────
+shell_command:
+  sharp_upload_snapshot: >
+    curl -s -X POST http://VPS_TAILSCALE_IP:8080/capture
+    -F "image=@/config/www/sharp_snapshot.jpg"
+    -F "source=home_assistant"

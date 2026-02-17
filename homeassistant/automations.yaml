@@ -1,0 +1,127 @@
+# =============================================================================
+# Home Assistant Automations — Aqara G5 Pro → SHARP Pipeline
+# =============================================================================
+#
+# Add these to your Home Assistant automations.yaml (or create via the UI).
+#
+# These automations detect events from the Aqara G5 Pro camera and send a
+# lightweight trigger to the SHARP pipeline server over Tailscale.
+#
+# PREREQUISITES:
+#   - Aqara G5 Pro integrated via the Aqara integration in HA
+#   - Your HA instance and VPS are both on the same Tailscale network
+#   - Replace VPS_TAILSCALE_IP with your VPS's actual Tailscale IP (100.x.x.x)
+#
+# APPROACH A (Recommended): Lightweight trigger — the VPS pulls the frame
+# itself from the camera's RTSP stream over Tailscale.
+#
+# APPROACH B (Alternative): HA captures the snapshot and uploads the image.
+# =============================================================================
+
+# ─────────────────────────────────────────────────────────────────────────────
+# APPROACH A: Lightweight trigger (VPS pulls the frame)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Trigger on person detection
+- alias: "SHARP: Person detected"
+  id: sharp_person_detected
+  description: "Send trigger to SHARP pipeline when a person is detected"
+  trigger:
+    # Option 1: If exposed as a binary sensor via Aqara integration
+    - platform: state
+      entity_id: binary_sensor.aqara_g5_pro_person_detected
+      to: "on"
+    # Option 2: If using Frigate, use the Frigate event
+    # - platform: mqtt
+    #   topic: frigate/events
+    #   payload: "new"
+    #   value_template: "{{ value_json.type }}"
+  condition:
+    # Debounce: don't fire more than once per 30 seconds
+    - condition: template
+      value_template: >
+        {{ (as_timestamp(now()) - as_timestamp(
+            state_attr('automation.sharp_person_detected', 'last_triggered')
+            | default(0))) > 30 }}
+  action:
+    - service: rest_command.sharp_trigger
+      data:
+        source: "home_assistant"
+        event_type: "person"
+  mode: single
+
+# Trigger on animal detection
+- alias: "SHARP: Animal detected"
+  id: sharp_animal_detected
+  description: "Send trigger to SHARP pipeline when an animal is detected"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.aqara_g5_pro_animal_detected
+      to: "on"
+  condition:
+    - condition: template
+      value_template: >
+        {{ (as_timestamp(now()) - as_timestamp(
+            state_attr('automation.sharp_animal_detected', 'last_triggered')
+            | default(0))) > 30 }}
+  action:
+    - service: rest_command.sharp_trigger
+      data:
+        source: "home_assistant"
+        event_type: "animal"
+  mode: single
+
+# Trigger on generic motion (optional — can be noisy)
+- alias: "SHARP: Motion detected"
+  id: sharp_motion_detected
+  description: "Send trigger to SHARP pipeline on motion detection"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.aqara_g5_pro_motion
+      to: "on"
+  condition:
+    # Longer debounce for motion since it fires often
+    - condition: template
+      value_template: >
+        {{ (as_timestamp(now()) - as_timestamp(
+            state_attr('automation.sharp_motion_detected', 'last_triggered')
+            | default(0))) > 60 }}
+  action:
+    - service: rest_command.sharp_trigger
+      data:
+        source: "home_assistant"
+        event_type: "motion"
+  mode: single
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# APPROACH B: HA captures snapshot and uploads it
+# ─────────────────────────────────────────────────────────────────────────────
+# Uncomment this if you prefer HA to capture and send the image.
+# This gives you more control over which exact frame is sent.
+
+# - alias: "SHARP: Person detected (with snapshot)"
+#   id: sharp_person_snapshot
+#   trigger:
+#     - platform: state
+#       entity_id: binary_sensor.aqara_g5_pro_person_detected
+#       to: "on"
+#   condition:
+#     - condition: template
+#       value_template: >
+#         {{ (as_timestamp(now()) - as_timestamp(
+#             state_attr('automation.sharp_person_snapshot', 'last_triggered')
+#             | default(0))) > 30 }}
+#   action:
+#     # Step 1: Capture a snapshot from the camera
+#     - service: camera.snapshot
+#       target:
+#         entity_id: camera.aqara_g5_pro
+#       data:
+#         filename: /config/www/sharp_snapshot.jpg
+#     # Step 2: Small delay to ensure file is written
+#     - delay:
+#         seconds: 1
+#     # Step 3: Upload to VPS
+#     - service: shell_command.sharp_upload_snapshot
+#   mode: single

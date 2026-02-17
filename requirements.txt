@@ -1,0 +1,8 @@
+# SHARP Pipeline server dependencies
+flask>=3.0
+pyyaml>=6.0
+requests>=2.31
+
+# SHARP itself is installed separately via:
+#   git clone https://github.com/apple/ml-sharp.git
+#   cd ml-sharp && pip install -r requirements.txt
